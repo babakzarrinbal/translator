@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audio Device Selector</title>
+</head>
+<body>
+<h2>Select Audio Input Device</h2>
+<select id="audioInputSelect"></select>
+
+<h2>Select Audio Output Device</h2>
+<select id="audioOutputSelect"></select>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const audioInputSelect = document.getElementById('audioInputSelect');
+  const audioOutputSelect = document.getElementById('audioOutputSelect');
+
+  async function listDevices() {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const audioInputDevices = devices.filter(device => device.kind === 'audioinput');
+    const audioOutputDevices = devices.filter(device => device.kind === 'audiooutput');
+    audioInputSelect.innerHTML = audioInputDevices.map(device => `<option value="${device.deviceId}">${device.label}</option>`).join('');
+    audioOutputSelect.innerHTML = audioOutputDevices.map(device => `<option value="${device.deviceId}">${device.label}</option>`).join('');
+  }
+
+  try {
+    // Request permissions by attempting to access the user's microphone
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    stream.getTracks().forEach(track => track.stop()); // Stop using the microphone
+
+    // Now list the devices
+    await listDevices();
+  } catch (error) {
+    console.error('Error accessing media devices:', error);
+  }
+  navigator.mediaDevices.addEventListener('devicechange', listDevices);
+
+  let currentStream;
+
+  audioInputSelect.addEventListener('change', async () => {
+    if (currentStream) {
+      currentStream.getTracks().forEach(track => track.stop());
+    }
+    const audioSource = audioInputSelect.value;
+    const constraints = {
+      audio: { deviceId: audioSource ? { exact: audioSource } : undefined },
+    };
+    currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+    const audioTracks = currentStream.getAudioTracks();
+    if (audioTracks.length > 0) {
+      console.log(`Using audio device: ${audioTracks[0].label}`);
+    }
+  });
+
+  audioOutputSelect.addEventListener('change', async () => {
+    if (!currentStream) return;
+    const audioSinkId = audioOutputSelect.value;
+    try {
+      const audioElement = new Audio();
+      audioElement.srcObject = currentStream;
+      await audioElement.setSinkId(audioSinkId);
+      audioElement.play();
+      console.log(`Audio output device set to ${audioElement.sinkId}`);
+    } catch (error) {
+      console.error('Error assigning audio output device:', error);
+    }
+  });
+});
+</script>
+</body>
+</html>
