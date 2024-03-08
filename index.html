@@ -3,33 +3,49 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Audio Input Selector</title>
+<title>Audio Device Selector</title>
 </head>
 <body>
 <h2>Select Audio Input Device</h2>
 <select id="audioInputSelect"></select>
 
+<!-- Audio Output Selection will not function on many mobile browsers -->
+<h2>Select Audio Output Device (Desktop Only)</h2>
+<select id="audioOutputSelect" style="display: none;"></select>
+<div id="outputNote" style="color: red;">Note: Audio output device selection may not work on mobile devices.</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
   const audioInputSelect = document.getElementById('audioInputSelect');
+  const audioOutputSelect = document.getElementById('audioOutputSelect');
+  const outputNote = document.getElementById('outputNote');
+
+  // Initially request user media to trigger permission request which allows device labels to be populated
+  try {
+    await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (error) {
+    console.error('Error accessing media devices:', error);
+  }
 
   async function listDevices() {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const audioInputDevices = devices.filter(device => device.kind === 'audioinput');
+    const audioOutputDevices = devices.filter(device => device.kind === 'audiooutput');
 
     audioInputSelect.innerHTML = audioInputDevices.map(device => `<option value="${device.deviceId}">${device.label || 'Microphone ' + (audioInputDevices.indexOf(device) + 1)}</option>`).join('');
+
+    if (audioOutputDevices.length > 1 && HTMLMediaElement.prototype.setSinkId) {
+      audioOutputSelect.style.display = 'inline';
+      outputNote.style.display = 'none';
+      audioOutputSelect.innerHTML = audioOutputDevices.map(device => `<option value="${device.deviceId}">${device.label || 'Speaker ' + (audioOutputDevices.indexOf(device) + 1)}</option>`).join('');
+    } else {
+      // Hide output selection on devices where it's not supported
+      audioOutputSelect.style.display = 'none';
+      outputNote.style.display = 'inline';
+    }
   }
 
-  try {
-    // Request permissions by attempting to access the user's microphone
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    stream.getTracks().forEach(track => track.stop()); // Stop using the microphone
-
-    // Now list the devices
-    await listDevices();
-  } catch (error) {
-    console.error('Error accessing media devices:', error);
-  }
+  await listDevices();
   navigator.mediaDevices.addEventListener('devicechange', listDevices);
 
   let currentStream;
@@ -46,6 +62,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     const audioTracks = currentStream.getAudioTracks();
     if (audioTracks.length > 0) {
       console.log(`Using audio device: ${audioTracks[0].label}`);
+    }
+  });
+
+  // Handle output device change
+  audioOutputSelect.addEventListener('change', async () => {
+    if (!currentStream || !HTMLMediaElement.prototype.setSinkId) return;
+    const audioSinkId = audioOutputSelect.value;
+    try {
+      const audioElement = new Audio();
+      audioElement.srcObject = currentStream;
+      await audioElement.setSinkId(audioSinkId);
+      audioElement.play();
+      console.log(`Audio output device set to ${audioElement.sinkId}`);
+    } catch (error) {
+      console.error('Error assigning audio output device:', error);
     }
   });
 });
