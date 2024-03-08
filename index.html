@@ -3,26 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Audio Device Selector</title>
+<title>Audio Input Selector</title>
 </head>
 <body>
 <h2>Select Audio Input Device</h2>
 <select id="audioInputSelect"></select>
 
-<h2>Select Audio Output Device</h2>
-<select id="audioOutputSelect"></select>
-
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
   const audioInputSelect = document.getElementById('audioInputSelect');
-  const audioOutputSelect = document.getElementById('audioOutputSelect');
 
   async function listDevices() {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const audioInputDevices = devices.filter(device => device.kind === 'audioinput');
-    const audioOutputDevices = devices.filter(device => device.kind === 'audiooutput');
-    audioInputSelect.innerHTML = audioInputDevices.map(device => `<option value="${device.deviceId}">${device.label}</option>`).join('');
-    audioOutputSelect.innerHTML = audioOutputDevices.map(device => `<option value="${device.deviceId}">${device.label}</option>`).join('');
+
+    audioInputSelect.innerHTML = audioInputDevices.map(device => `<option value="${device.deviceId}">${device.label || 'Microphone ' + (audioInputDevices.indexOf(device) + 1)}</option>`).join('');
   }
 
   try {
@@ -51,20 +46,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const audioTracks = currentStream.getAudioTracks();
     if (audioTracks.length > 0) {
       console.log(`Using audio device: ${audioTracks[0].label}`);
-    }
-  });
-
-  audioOutputSelect.addEventListener('change', async () => {
-    if (!currentStream) return;
-    const audioSinkId = audioOutputSelect.value;
-    try {
-      const audioElement = new Audio();
-      audioElement.srcObject = currentStream;
-      await audioElement.setSinkId(audioSinkId);
-      audioElement.play();
-      console.log(`Audio output device set to ${audioElement.sinkId}`);
-    } catch (error) {
-      console.error('Error assigning audio output device:', error);
     }
   });
 });
